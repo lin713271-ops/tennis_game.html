@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>網球Q版大對決 - Tennis Arcade</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Cute Round Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', 'Fredoka', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .retro-shadow {
+            box-shadow: 0 8px 0 rgba(0, 0, 0, 0.15), 0 15px 20px rgba(0, 0, 0, 0.1);
+        }
+        .btn-press:active {
+            transform: translateY(4px);
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+        }
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .animate-bounce-slow {
+            animation: bounce-slow 2s infinite ease-in-out;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { filter: drop-shadow(0 0 5px rgba(234, 179, 8, 0.8)); }
+            50% { filter: drop-shadow(0 0 20px rgba(234, 179, 8, 1)); }
+        }
+        .glow-effect {
+            animation: pulse-glow 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="h-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex flex-col items-center justify-between overflow-hidden p-3 sm:p-6">
+
+    <!-- Top Header & Navigation -->
+    <header class="w-full max-w-4xl flex items-center justify-between bg-white/90 backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg z-20">
+        <div class="flex items-center space-x-3">
+            <div class="bg-emerald-500 text-white p-2 rounded-xl text-xl sm:text-2xl shadow-md">
+                <i class="fa-solid fa-table-tennis-paddle-ball"></i>
+            </div>
+            <div>
+                <h1 class="text-base sm:text-xl font-black text-slate-800 tracking-wide">網球Q版大對決</h1>
+                <p id="mode-subtitle" class="text-xs sm:text-sm font-bold text-emerald-600">模式 1：發球大對決</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <!-- Mode Switcher -->
+            <button id="switch-mode-btn" onclick="app.switchMode()" class="px-3 sm:px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition transform active:scale-95 flex items-center space-x-1">
+                <i class="fa-solid fa-shuffle mr-1"></i>
+                <span id="switch-btn-text">切換精準過網王</span>
+            </button>
+            <!-- Pause Button (Mode 2 only) -->
+            <button id="pause-btn" onclick="app.togglePause()" class="hidden px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition transform active:scale-95">
+                <i class="fa-solid fa-pause"></i> 暫停
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Arena -->
+    <main class="w-full max-w-4xl flex-1 my-3 bg-slate-900/40 backdrop-blur-sm rounded-3xl p-2 sm:p-4 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl border border-white/20">
+        
+        <!-- Canvas Container -->
+        <div id="canvas-container" class="w-full h-full relative rounded-2xl overflow-hidden shadow-inner bg-gradient-to-b from-sky-300 via-sky-100 to-emerald-300">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+            <!-- Mode 1 UI Overlay (Power Bar & Charge Instruction) -->
+            <div id="mode1-ui" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 sm:p-6">
+                <!-- Top Power Bar Container -->
+                <div class="w-full max-w-md mx-auto bg-white/80 backdrop-blur-md p-3 rounded-2xl shadow-lg border border-white flex flex-col items-center pointer-events-auto">
+                    <div class="flex justify-between w-full mb-1 text-xs sm:text-sm font-black text-slate-700">
+                        <span><i class="fa-solid fa-bolt text-amber-500 mr-1"></i>力量蓄積條 (Power)</span>
+                        <span id="power-val">0%</span>
+                    </div>
+                    <div class="w-full h-5 bg-slate-200 rounded-full overflow-hidden p-0.5 shadow-inner">
+                        <div id="power-fill" class="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 rounded-full transition-all duration-75 w-0"></div>
+                    </div>
+                </div>
+
+                <!-- Center/Bottom Instruction & Result Banner -->
+                <div class="flex flex-col items-center mb-4">
+                    <div id="result-badge" class="hidden mb-3 bg-white/95 px-6 py-3 rounded-2xl shadow-2xl border-4 border-amber-400 transform transition-all duration-300 scale-0">
+                        <div id="result-title" class="text-xl sm:text-3xl font-black text-rose-600 text-center">好球！</div>
+                        <div id="result-distance" class="text-sm sm:text-lg font-bold text-slate-700 text-center mt-1">飛行距離：25 公尺</div>
+                    </div>
+                    
+                    <div class="bg-black/40 backdrop-blur-md px-6 py-2.5 rounded-full text-white font-bold text-xs sm:text-sm tracking-wide shadow-lg animate-bounce-slow">
+                        💡 點擊並按住螢幕下方按鈕集氣，放開全力揮拍！
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mode 2 UI Overlay (Timer, Score, Speed Selector) -->
+            <div id="mode2-ui" class="absolute inset-0 pointer-events-none hidden flex flex-col justify-between p-4 sm:p-6">
+                <!-- Top Stats bar -->
+                <div class="flex justify-between items-center w-full">
+                    <div class="bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg border border-white flex items-center space-x-3 pointer-events-auto">
+                        <div class="text-rose-500 font-black text-lg sm:text-xl"><i class="fa-solid fa-stopwatch"></i> <span id="timer-display">60</span>s</div>
+                        <div class="h-6 w-px bg-slate-200"></div>
+                        <div class="text-emerald-600 font-black text-lg sm:text-xl"><i class="fa-solid fa-star"></i> <span id="score-display">0</span> 分</div>
+                    </div>
+
+                    <!-- Speed Selector -->
+                    <div class="bg-white/90 backdrop-blur-md p-1.5 rounded-2xl shadow-lg border border-white flex items-center space-x-1 pointer-events-auto">
+                        <span class="text-xs font-bold text-slate-600 px-2 hidden sm:inline">球速:</span>
+                        <button onclick="app.setSpeed('slow')" id="speed-slow" class="px-2.5 py-1 text-xs font-bold rounded-xl transition bg-emerald-500 text-white shadow">慢</button>
+                        <button onclick="app.setSpeed('normal')" id="speed-normal" class="px-2.5 py-1 text-xs font-bold rounded-xl transition bg-slate-200 text-slate-700">中</button>
+                        <button onclick="app.setSpeed('superslow')" id="speed-superslow" class="px-2.5 py-1 text-xs font-bold rounded-xl transition bg-slate-200 text-slate-700">超慢</button>
+                    </div>
+                </div>
+
+                <!-- Mode 2 Touch/Move Guide & Zones -->
+                <div class="w-full flex justify-between items-end pb-2 pointer-events-none">
+                    <div class="bg-black/30 backdrop-blur-sm px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-bold shadow-md">
+                        👉 點擊畫面的左、中、右區域移動接球！
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pause Modal Overlay -->
+            <div id="pause-modal" class="absolute inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-30">
+                <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full mx-4 transform scale-95 transition-transform duration-300">
+                    <div class="text-4xl text-amber-500 mb-2"><i class="fa-solid fa-circle-pause"></i></div>
+                    <h2 class="text-2xl font-black text-slate-800 mb-1">遊戲暫停</h2>
+                    <p class="text-sm text-slate-500 mb-6">休息一下，隨時準備繼續挑戰！</p>
+                    <div class="flex flex-col space-y-3">
+                        <button onclick="app.togglePause()" class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl shadow-lg transition transform active:scale-95">
+                            <i class="fa-solid fa-play mr-2"></i> 繼續遊戲
+                        </button>
+                        <button onclick="app.restartGame()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition">
+                            <i class="fa-solid fa-rotate-right mr-2"></i> 重新開始
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Over / Summary Modal Overlay -->
+            <div id="gameover-modal" class="absolute inset-0 bg-black/70 backdrop-blur-md hidden flex items-center justify-center z-30">
+                <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full mx-4 animate-bounce-slow">
+                    <div class="text-5xl text-amber-400 mb-2 glow-effect"><i class="fa-solid fa-trophy"></i></div>
+                    <h2 class="text-2xl sm:text-3xl font-black text-slate-800 mb-1">時間到！</h2>
+                    <p class="text-sm text-slate-500 mb-4">精準過網王挑戰結算</p>
+                    
+                    <div class="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 mb-6">
+                        <div class="text-xs font-bold text-emerald-600 mb-1 uppercase tracking-wider">總得分</div>
+                        <div id="final-score" class="text-4xl sm:text-5xl font-black text-emerald-600">0 分</div>
+                    </div>
+
+                    <div class="flex space-x-3">
+                        <button onclick="app.restartGame()" class="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl shadow-lg transition transform active:scale-95">
+                            <i class="fa-solid fa-rotate-right mr-1"></i> 再玩一次
+                        </button>
+                        <button onclick="app.switchMode()" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-lg transition transform active:scale-95">
+                            <i class="fa-solid fa-shuffle mr-1"></i> 切換模式
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Bottom Interactive Control Deck -->
+    <footer class="w-full max-w-4xl flex flex-col items-center z-20">
+        <!-- Mode 1 Control Button (Hold to Charge) -->
+        <div id="mode1-control" class="w-full flex items-center justify-center">
+            <button id="charge-btn" class="w-full max-w-md py-4 sm:py-5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-lg sm:text-xl rounded-2xl retro-shadow btn-press transition flex items-center justify-center space-x-2 border-2 border-white/40">
+                <i class="fa-solid fa-hand-pointer mr-2"></i>
+                <span id="charge-btn-text">按住不放來集氣！</span>
+            </button>
+        </div>
+
+        <!-- Mode 2 Control Panel (Left / Center / Right Tap Zones) -->
+        <div id="mode2-control" class="w-full hidden grid grid-cols-3 gap-2 sm:gap-4">
+            <button onclick="app.movePlayerLane(0)" class="py-4 sm:py-5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-base sm:text-lg rounded-2xl retro-shadow btn-press transition flex flex-col items-center justify-center border-2 border-white/30">
+                <i class="fa-solid fa-arrow-left mb-1"></i> 左側
+            </button>
+            <button onclick="app.movePlayerLane(1)" class="py-4 sm:py-5 bg-teal-600 hover:bg-teal-700 text-white font-black text-base sm:text-lg rounded-2xl retro-shadow btn-press transition flex flex-col items-center justify-center border-2 border-white/30">
+                <i class="fa-solid fa-circle mb-1"></i> 中央
+            </button>
+            <button onclick="app.movePlayerLane(2)" class="py-4 sm:py-5 bg-cyan-600 hover:bg-cyan-700 text-white font-black text-base sm:text-lg rounded-2xl retro-shadow btn-press transition flex flex-col items-center justify-center border-2 border-white/30">
+                <i class="fa-solid fa-arrow-right mb-1"></i> 右側
+            </button>
+        </div>
+    </footer>
+
+    <!-- Game Logic Engine -->
+    <script>
+        class TennisArcadeGame {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.mode = 1; // 1: 發球大對決, 2: 精準過網王
+                
+                // Responsive dimensions
+                this.width = 800;
+                this.height = 500;
+                
+                // Common character state (Q-style student)
+                this.char = {
+                    x: this.width / 2,
+                    y: this.height - 110,
+                    radius: 35,
+                    lane: 1, // 0: Left, 1: Center, 2: Right (Mode 2)
+                    targetX: this.width / 2,
+                    swinging: false,
+                    swingFrame: 0
+                };
+
+                // Mode 1 State: Serve Showdown
+                this.mode1 = {
+                    charging: false,
+                    power: 0,
+                    maxPower: 100,
+                    ball: { x: this.width / 2, y: this.height - 140, vx: 0, vy: 0, active: false, landed: false, radius: 10 },
+                    distance: 0,
+                    resultText: '',
+                    animating: false
+                };
+
+                // Mode 2 State: Precision Net Master
+                this.mode2 = {
+                    score: 0,
+                    timeLeft: 60,
+                    timerActive: false,
+                    paused: false,
+                    speedSetting: 'slow', // 'slow', 'normal', 'superslow'
+                    speedMultiplier: 0.7,
+                    incomingBalls: [],
+                    spawnTimer: 0,
+                    lastFrameTime: performance.now(),
+                    feedback: null, // { text: '得分!', color: '#10b981', timer: 0 }
+                };
+
+                this.initCanvasSize();
+                this.initEventListeners();
+                this.setupMode1Controls();
+                
+                // Start Loop
+                requestAnimationFrame(this.loop.bind(this));
+            }
+
+            initCanvasSize() {
+                const container = document.getElementById('canvas-container');
+                const dpr = window.devicePixelRatio || 1;
+                this.width = container.clientWidth || 800;
+                this.height = container.clientHeight || 450;
+                
+                this.canvas.width = this.width * dpr;
+                this.canvas.height = this.height * dpr;
+                this.ctx.scale(dpr, dpr);
+
+                // Re-position character
+                this.char.y = this.height - 90;
+                this.char.x = this.width / 2;
+                this.char.targetX = this.char.x;
+            }
+
+            initEventListeners() {
+                window.addEventListener('resize', () => {
+                    this.initCanvasSize();
+                });
+
+                // Mode 2 Keyboard controls (Arrow keys / A D / Left Center Right)
+                window.addEventListener('keydown', (e) => {
+                    if (this.mode === 2 && !this.mode2.paused && this.mode2.timerActive) {
+                        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                            this.movePlayerLane(0);
+                        } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S' || e.key === ' ') {
+                            this.movePlayerLane(1);
+                        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                            this.movePlayerLane(2);
+                        }
+                    }
+                });
+
+                // Canvas click / touch for Mode 2 direct touch navigation
+                this.canvas.addEventListener('pointerdown', (e) => {
+                    if (this.mode === 2 && !this.mode2.paused && this.mode2.timerActive) {
+                        const rect = this.canvas.getBoundingClientRect();
+                        const clientX = e.clientX - rect.left;
+                        const third = this.width / 3;
+                        if (clientX < third) {
+                            this.movePlayerLane(0);
+                        } else if (clientX < third * 2) {
+                            this.movePlayerLane(1);
+                        } else {
+                            this.movePlayerLane(2);
+                        }
+                    }
+                });
+            }
+
+            setupMode1Controls() {
+                const btn = document.getElementById('charge-btn');
+                
+                const startCharge = (e) => {
+                    e.preventDefault();
+                    if (this.mode !== 1) return;
+                    
+                    // If ball has already landed / finished previous shot, restart state immediately on new press
+                    if (this.mode1.animating && this.mode1.ball.landed) {
+                        this.restartGame();
+                    }
+
+                    if (this.mode1.animating && !this.mode1.ball.landed) return;
+
+                    this.mode1.charging = true;
+                    this.mode1.power = 0;
+                    document.getElementById('result-badge').classList.add('scale-0');
+                    document.getElementById('result-badge').classList.remove('scale-100', 'hidden');
+                    document.getElementById('charge-btn-text').innerText = '集氣中... 放開揮拍！';
+                };
+
+                const endCharge = (e) => {
+                    e.preventDefault();
+                    if (this.mode !== 1 || !this.mode1.charging) return;
+                    this.mode1.charging = false;
+                    this.executeServe();
+                };
+
+                btn.addEventListener('mousedown', startCharge);
+                btn.addEventListener('mouseup', endCharge);
+                btn.addEventListener('mouseleave', endCharge);
+                btn.addEventListener('touchstart', startCharge, { passive: false });
+                btn.addEventListener('touchend', endCharge, { passive: false });
+
+                // Also allow clicking directly on canvas in Mode 1 after landing to reset/restart
+                this.canvas.addEventListener('pointerdown', (e) => {
+                    if (this.mode === 1 && this.mode1.animating && this.mode1.ball.landed) {
+                        this.restartGame();
+                    }
+                });
+            }
+
+            executeServe() {
+                this.mode1.animating = true;
+                this.char.swinging = true;
+                this.char.swingFrame = 15;
+                document.getElementById('charge-btn-text').innerText = '球飛行中... 點擊按鈕或畫面再玩一次！';
+
+                // Calculate distance based on power (e.g. 10m to 120m)
+                const powerRatio = this.mode1.power / this.mode1.maxPower;
+                const distance = Math.floor(10 + powerRatio * 115);
+                this.mode1.distance = distance;
+
+                // Determine label
+                let title = "好球！";
+                if (distance > 90) {
+                    title = "全壘打！🔥";
+                } else if (distance > 60) {
+                    title = "超強力扣殺！⚡";
+                } else if (distance > 35) {
+                    title = "漂亮的發球！✨";
+                }
+
+                this.mode1.resultText = title;
+
+                // Ball flight physics initialization
+                this.mode1.ball = {
+                    x: this.char.x,
+                    y: this.char.y - 20,
+                    vx: (powerRatio * 12) + 4,
+                    vy: -(powerRatio * 12) - 6,
+                    active: true,
+                    landed: false,
+                    radius: 10,
+                    targetDistX: this.width * 0.3 + (powerRatio * (this.width * 0.55))
+                };
+            }
+
+            switchMode() {
+                if (this.mode === 1) {
+                    this.mode = 2;
+                    document.getElementById('mode-subtitleinnerText', '模式 2：精準過網王');
+                    document.getElementById('mode-subtitle').innerText = '模式 2：精準過網王';
+                    document.getElementById('switch-btn-text').innerText = '切換發球大對決';
+                    document.getElementById('mode1-ui').classList.add('hidden');
+                    document.getElementById('mode2-ui').classList.remove('hidden');
+                    document.getElementById('mode1-control').classList.add('hidden');
+                    document.getElementById('mode2-control').classList.remove('hidden');
+                    document.getElementById('pause-btn').classList.remove('hidden');
+                    
+                    this.startMode2Game();
+                } else {
+                    this.mode = 1;
+                    document.getElementById('mode-subtitle').innerText = '模式 1：發球大對決';
+                    document.getElementById('switch-btn-text').innerText = '切換精準過網王';
+                    document.getElementById('mode2-ui').classList.add('hidden');
+                    document.getElementById('mode1-ui').classList.remove('hidden');
+                    document.getElementById('mode2-control').classList.add('hidden');
+                    document.getElementById('mode1-control').classList.remove('hidden');
+                    document.getElementById('pause-btn').classList.add('hidden');
+                    
+                    this.mode2.timerActive = false;
+                    this.mode2.paused = false;
+                    document.getElementById('pause-modal').classList.add('hidden');
+                    document.getElementById('gameover-modal').classList.add('hidden');
+                }
+            }
+
+            startMode2Game() {
+                this.mode2.score = 0;
+                this.mode2.timeLeft = 60;
+                this.mode2.timerActive = true;
+                this.mode2.paused = false;
+                this.mode2.incomingBalls = [];
+                this.mode2.spawnTimer = 0;
+                document.getElementById('score-display').innerText = '0';
+                document.getElementById('timer-display').innerText = '60';
+                document.getElementById('gameover-modal').classList.add('hidden');
+                document.getElementById('pause-modal').classList.add('hidden');
+
+                // Timer interval
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(() => {
+                    if (this.mode2.timerActive && !this.mode2.paused) {
+                        this.mode2.timeLeft--;
+                        document.getElementById('timer-display').innerText = this.mode2.timeLeft;
+                        if (this.mode2.timeLeft <= 0) {
+                            this.endMode2Game();
+                        }
+                    }
+                }, 1000);
+            }
+
+            endMode2Game() {
+                this.mode2.timerActive = false;
+                clearInterval(this.timerInterval);
+                document.getElementById('final-score').innerText = `${this.mode2.score} 分`;
+                document.getElementById('gameover-modal').classList.remove('hidden');
+            }
+
+            togglePause() {
+                if (this.mode !== 2) return;
+                this.mode2.paused = !this.mode2.paused;
+                const modal = document.getElementById('pause-modal');
+                if (this.mode2.paused) {
+                    modal.classList.remove('hidden');
+                } else {
+                    modal.classList.add('hidden');
+                }
+            }
+
+            restartGame() {
+                if (this.mode === 1) {
+                    this.mode1.charging = false;
+                    this.mode1.power = 0;
+                    this.mode1.animating = false;
+                    this.mode1.ball = { x: this.width / 2, y: this.height - 140, vx: 0, vy: 0, active: false, landed: false, radius: 10 };
+                    document.getElementById('power-fill').style.width = '0%';
+                    document.getElementById('power-val').innerText = '0%';
+                    document.getElementById('result-badge').classList.add('scale-0', 'hidden');
+                    document.getElementById('charge-btn-text').innerText = '按住不放來集氣！';
+                } else {
+                    this.startMode2Game();
+                }
+            }
+
+            setSpeed(speed) {
+                this.mode2.speedSetting = speed;
+                ['slow', 'normal', 'superslow'].forEach(s => {
+                    const btn = document.getElementById(`speed-${s}`);
+                    if (s === speed) {
+                        btn.className = "px-2.5 py-1 text-xs font-bold rounded-xl transition bg-emerald-500 text-white shadow";
+                    } else {
+                        btn.className = "px-2.5 py-1 text-xs font-bold rounded-xl transition bg-slate-200 text-slate-700";
+                    }
+                });
+
+                if (speed === 'slow') this.mode2.speedMultiplier = 0.7;
+                else if (speed === 'normal') this.mode2.speedMultiplier = 1.2;
+                else if (speed === 'superslow') this.mode2.speedMultiplier = 0.4;
+            }
+
+            movePlayerLane(lane) {
+                this.char.lane = lane;
+                // Lanes: 0 (Left), 1 (Center), 2 (Right)
+                const third = this.width / 3;
+                if (lane === 0) this.char.targetX = third * 0.5;
+                else if (lane === 1) this.char.targetX = this.width * 0.5;
+                else this.char.targetX = third * 2.5;
+
+                this.char.swinging = true;
+                this.char.swingFrame = 12;
+
+                // Check collision with incoming balls in Mode 2
+                if (this.mode === 2 && this.mode2.timerActive && !this.mode2.paused) {
+                    let hitScored = false;
+                    this.mode2.incomingBalls.forEach(ball => {
+                        if (!ball.hit && Math.abs(ball.lane - lane) === 0 && ball.y > this.height - 150 && ball.y < this.height - 50) {
+                            ball.hit = true;
+                            ball.returnAnim = true;
+                            hitScored = true;
+                        }
+                    });
+
+                    if (hitScored) {
+                        this.mode2.score++;
+                        document.getElementById('score-display').innerText = this.mode2.score;
+                        this.showFloatingFeedback('得分 +1! 🎾', '#10b981');
+                    }
+                }
+            }
+
+            showFloatingFeedback(text, color) {
+                this.mode2.feedback = { text, color, alpha: 1.0, yOffset: 0 };
+            }
+
+            loop(timestamp) {
+                const dt = (timestamp - this.mode2.lastFrameTime) / 1000;
+                this.mode2.lastFrameTime = timestamp;
+
+                this.update(dt);
+                this.render();
+
+                requestAnimationFrame(this.loop.bind(this));
+            }
+
+            update(dt) {
+                // Smooth character movement to targetX
+                this.char.x += (this.char.targetX - this.char.x) * 0.2;
+
+                if (this.char.swinging) {
+                    this.char.swingFrame--;
+                    if (this.char.swingFrame <= 0) {
+                        this.char.swinging = false;
+                    }
+                }
+
+                // Mode 1: Power accumulation and ball flight
+                if (this.mode === 1) {
+                    if (this.mode1.charging) {
+                        this.mode1.power += 1.5;
+                        if (this.mode1.power > this.mode1.maxPower) {
+                            this.mode1.power = this.mode1.maxPower;
+                        }
+                        document.getElementById('power-fill').style.width = `${this.mode1.power}%`;
+                        document.getElementById('power-val').innerText = `${Math.floor(this.mode1.power)}%`;
+                    }
+
+                    if (this.mode1.ball.active) {
+                        const b = this.mode1.ball;
+                        b.x += b.vx;
+                        b.y += b.vy;
+                        b.vy += 0.35; // gravity
+
+                        // Check if ball lands
+                        if (b.y >= this.height - 120 && !b.landed) {
+                            b.landed = true;
+                            b.vy = 0;
+                            b.vx = 0;
+                            
+                            // Show result badge
+                            const badge = document.getElementById('result-badge');
+                            document.getElementById('result-title').innerText = this.mode1.resultText;
+                            document.getElementById('result-distance').innerText = `飛行距離：${this.mode1.distance} 公尺`;
+                            badge.classList.remove('hidden', 'scale-0');
+                            badge.classList.add('scale-100');
+                        }
+                    }
+                }
+
+                // Mode 2: Ball spawning and updating
+                if (this.mode === 2 && this.mode2.timerActive && !this.mode2.paused) {
+                    this.mode2.spawnTimer += dt * this.mode2.speedMultiplier;
+                    if (this.mode2.spawnTimer > 1.8) {
+                        this.mode2.spawnTimer = 0;
+                        const randomLane = Math.floor(Math.random() * 3); // 0, 1, 2
+                        const startX = (this.width / 3) * randomLane + (this.width / 6);
+                        this.mode2.incomingBalls.push({
+                            x: startX,
+                            y: 80,
+                            targetY: this.height - 90,
+                            lane: randomLane,
+                            speed: (120 + Math.random() * 60) * this.mode2.speedMultiplier,
+                            hit: false,
+                            returnAnim: false
+                        });
+                    }
+
+                    // Update incoming balls
+                    for (let i = this.mode2.incomingBalls.length - 1; i >= 0; i--) {
+                        let b = this.mode2.incomingBalls[i];
+                        if (!b.returnAnim) {
+                            b.y += b.speed * dt;
+                            // Missed check
+                            if (b.y > this.height - 40 && !b.hit) {
+                                this.mode2.incomingBalls.splice(i, 1);
+                            }
+                        } else {
+                            // Return fly away animation
+                            b.y -= b.speed * 1.5 * dt;
+                            b.x += (this.width / 2 - b.x) * 0.1;
+                            if (b.y < -50) {
+                                this.mode2.incomingBalls.splice(i, 1);
+                            }
+                        }
+                    }
+                }
+
+                // Feedback animation
+                if (this.mode2.feedback) {
+                    this.mode2.feedback.yOffset -= 1;
+                    this.mode2.feedback.alpha -= 0.02;
+                    if (this.mode2.feedback.alpha <= 0) {
+                        this.mode2.feedback = null;
+                    }
+                }
+            }
+
+            render() {
+                const ctx = this.ctx;
+                ctx.clearRect(0, 0, this.width, this.height);
+
+                // --- Draw Tennis Court Background ---
+                // Sky gradient
+                const skyGrad = ctx.createLinearGradient(0, 0, 0, this.height * 0.5);
+                skyGrad.addColorStop(0, '#38bdf8');
+                skyGrad.addColorStop(1, '#bae6fd');
+                ctx.fillStyle = skyGrad;
+                ctx.fillRect(0, 0, this.width, this.height * 0.5);
+
+                // Court floor (clay / hard court orange-blue style)
+                const courtGrad = ctx.createLinearGradient(0, this.height * 0.5, 0, this.height);
+                courtGrad.addColorStop(0, '#059669');
+                courtGrad.addColorStop(1, '#047857');
+                ctx.fillStyle = courtGrad;
+                ctx.fillRect(0, this.height * 0.5, this.width, this.height * 0.5);
+
+                // Court perspective lines
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.lineWidth = 3;
+                
+                // Baseline & Service lines
+                ctx.beginPath();
+                ctx.moveTo(this.width * 0.15, this.height);
+                ctx.lineTo(this.width * 0.35, this.height * 0.5);
+                ctx.lineTo(this.width * 0.65, this.height * 0.5);
+                ctx.lineTo(this.width * 0.85, this.height);
+                ctx.stroke();
+
+                // Center service line / division
+                ctx.beginPath();
+                ctx.moveTo(this.width * 0.5, this.height * 0.5);
+                ctx.lineTo(this.width * 0.5, this.height);
+                ctx.stroke();
+
+                // Net in the middle
+                const netY = this.height * 0.5;
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+                ctx.fillRect(this.width * 0.1, netY - 15, this.width * 0.8, 20);
+                
+                // Net mesh pattern
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                for (let nx = this.width * 0.1; nx <= this.width * 0.9; nx += 20) {
+                    ctx.moveTo(nx, netY - 15);
+                    ctx.lineTo(nx, netY + 5);
+                }
+                ctx.moveTo(this.width * 0.1, netY - 15);
+                ctx.lineTo(this.width * 0.9, netY - 15);
+                ctx.stroke();
+
+                // --- Draw Mode 1 Distance Markers on Court ---
+                if (this.mode === 1) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.font = 'bold 12px Noto Sans TC';
+                    ctx.textAlign = 'center';
+                    [25, 50, 75, 100].forEach((m, idx) => {
+                        const markerY = this.height * 0.55 + (idx * 35);
+                        ctx.beginPath();
+                        ctx.arc(this.width * 0.5, markerY, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillText(`${m}m`, this.width * 0.5 + 30, markerY + 4);
+                    });
+
+                    // Draw Mode 1 ball
+                    if (this.mode1.ball.active) {
+                        const b = this.mode1.ball;
+                        ctx.fillStyle = '#facc15';
+                        ctx.beginPath();
+                        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = '#ca8a04';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                }
+
+                // --- Draw Mode 2 Incoming Balls ---
+                if (this.mode === 2) {
+                    this.mode2.incomingBalls.forEach(b => {
+                        ctx.fillStyle = b.returnAnim ? '#10b981' : '#facc15';
+                        ctx.beginPath();
+                        ctx.arc(b.x, b.y, 12, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = '#b45309';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        // Tennis ball white seam
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.arc(b.x, b.y, 6, 0.2, Math.PI - 0.2);
+                        ctx.stroke();
+                    });
+
+                    // Draw Mode 2 Lane Guides at bottom
+                    const third = this.width / 3;
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(third, this.height * 0.5);
+                    ctx.lineTo(third, this.height);
+                    ctx.moveTo(third * 2, this.height * 0.5);
+                    ctx.lineTo(third * 2, this.height);
+                    ctx.stroke();
+                }
+
+                // --- Draw Cute Q-Style Student Character ---
+                this.drawQCharacter(ctx, this.char.x, this.char.y, this.char.swinging);
+
+                // --- Render Floating Feedback ---
+                if (this.mode2.feedback) {
+                    const fb = this.mode2.feedback;
+                    ctx.save();
+                    ctx.globalAlpha = fb.alpha;
+                    ctx.font = '900 24px Noto Sans TC';
+                    ctx.fillStyle = fb.color;
+                    ctx.textAlign = 'center';
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    ctx.shadowBlur = 8;
+                    ctx.fillText(fb.text, this.width / 2, this.height / 2 - 40 + fb.yOffset);
+                    ctx.restore();
+                }
+            }
+
+            drawQCharacter(ctx, x, y, swinging) {
+                ctx.save();
+                ctx.translate(x, y);
+
+                // Shadow under feet
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.beginPath();
+                ctx.ellipse(0, 25, 28, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Body (Cute uniform / t-shirt)
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.roundRect(-22, -5, 44, 32, [12, 12, 6, 6]);
+                ctx.fill();
+
+                // Collar
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(-8, -5);
+                ctx.lineTo(0, 4);
+                ctx.lineTo(8, -5);
+                ctx.closePath();
+                ctx.fill();
+
+                // Head (Chibi big head)
+                ctx.fillStyle = '#fde047'; // cute tan/skin tone
+                ctx.beginPath();
+                ctx.arc(0, -32, 26, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ca8a04';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Hair (Cute anime spikes)
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                ctx.arc(0, -38, 26, Math.PI, Math.PI * 2);
+                ctx.fill();
+                // Hair tuft
+                ctx.beginPath();
+                ctx.moveTo(-15, -58);
+                ctx.lineTo(-5, -45);
+                ctx.lineTo(-20, -48);
+                ctx.fill();
+
+                // Face Expression (Happy eyes & cute mouth)
+                ctx.fillStyle = '#1e293b';
+                // Left eye
+                ctx.beginPath();
+                ctx.arc(-8, -32, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Right eye
+                ctx.beginPath();
+                ctx.arc(8, -32, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Cute smile
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.arc(0, -28, 6, 0.1, Math.PI - 0.1, false);
+                ctx.stroke();
+
+                // Tennis Racket Arm & Racket
+                ctx.save();
+                if (swinging) {
+                    ctx.rotate(Math.sin(Date.now() * 0.03) * 0.8);
+                }
+                
+                // Arm
+                ctx.strokeStyle = '#fde047';
+                ctx.lineWidth = 8;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(15, -10);
+                ctx.lineTo(35, -20);
+                ctx.stroke();
+
+                // Racket Head
+                ctx.translate(35, -25);
+                ctx.rotate(Math.PI / 4);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 18, 24, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                // Racket strings
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-12, 0); ctx.lineTo(12, 0);
+                ctx.moveTo(0, -18); ctx.lineTo(0, 18);
+                ctx.stroke();
+
+                ctx.restore();
+                ctx.restore();
+            }
+        }
+
+        // Initialize application on window load
+        let app;
+        window.onload = () => {
+            app = new TennisArcadeGame();
+        };
+    </script>
+</body>
+</html>
